@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 from datetime import datetime
-from py2neo import Graph, Relationship
+from py2neo import Graph, Node, Relationship
 
 GRAPH = Graph(password="password")
 
@@ -12,28 +12,51 @@ def find_one(label, *args):
         find_node("User", "handle", "@userhandle")
 
     Returns None if the node isn't found in the database, or a Node object if
-    it is. Note: If multiple nodes match the given criteria, only the first will
+    it is.
+
+    NOTE: If multiple nodes match the given criteria, only the first will
     be returned.
     """
+
     nodes = GRAPH.find(label, *args)
     try:
         return next(nodes)
     except StopIteration:
         return None
 
+def create_user(handle, **kwargs):
+    """Attempts to create a user based on a handle and other keyword
+    arguments. If the handle is already taken we print a message and return.
+
+    returns: None
+
+    Note: in this implementation twitter handles ARE case-sensitive
+    """
+
+    if find_one("User", "handle", handle) is not None:
+        print("Handle", handle, "already taken!")
+        return
+
+    user = Node("User", handle=handle, **kwargs)
+    GRAPH.create(user)
+
+    print("Created User:", user.get('handle'))
+
 def tweet(user, tweet_text):
-    """Creates a tweet and attaches it to a user. This is an example to show
+    """Creates a tweet and attaches it to a user. This example shows
     how we can write native cypher queries in Python."""
 
     # Random unique identifier for each tweet. While tecnically not truly "unique",
-    # the odds of getting 2 duplicate values after generating a billion records
-    # is about 1 in a quintillion.
+    # the odds of getting a duplicate value after generating 100 trillion records
+    # is about 1 in a billion.
     tweet_id = str(uuid4())
 
     # While technically neo4j provides it's own datetime implementation, bolt
     # (the underlying engine) cannot pass those datetime objects back to python,
     # so instead we store them as a string.
     tweet_datetime = datetime.now().isoformat()
+
+    # The query is stored as a multi-line string.
     query = """
         MATCH (u:User {handle: {u_handle}})
         CREATE (u)-[:TWEETED]->(t:Tweet {text: {t_text},
@@ -79,6 +102,10 @@ def like(user, tweet_id):
     # Add to graph.
     GRAPH.create(Relationship(user_node, "LIKES", tweet_node))
 
-t_id = tweet("@ThePSF", "Python 3 is better than Python 2")
-like("@nickj", t_id)
-#like("@neo4j", t_id)
+if __name__ == "__main__":
+    create_user("@nickj")
+    create_user("@nickj", **{"bio": "Cool Kid", "name": "Nick Jarvis"})
+    create_user("@Google", **{"name": "Google Inc."})
+    #t_id = tweet("@ThePSF", "Python 3 is better than Python 2")
+    #like("@nickj", t_id)
+    #like("@neo4j", t_id)
