@@ -102,6 +102,18 @@ def like(user, tweet_id):
     # Add to graph.
     GRAPH.create(Relationship(user_node, "LIKES", tweet_node))
 
+def follow(follower, followed):
+    """Similar to the 'like' function, this provides a way for users to follow each other."""
+    follower_node = find_one("User", "handle", follower)
+    if follower_node is None:
+        print("User:", follower, "not found!")
+
+    followed_node = find_one("User", "handle", followed)
+    if followed_node is None:
+        print("User:", followed, "not found!")
+
+    GRAPH.create(Relationship(follower_node, "FOLLOWS", followed_node))
+
 if __name__ == "__main__":
     create_user("@nickj")
     create_user("@nickj", **{"bio": "Cool Kid", "name": "Nick Jarvis"})
