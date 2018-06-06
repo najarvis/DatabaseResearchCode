@@ -98,6 +98,7 @@ def like(user, tweet_id):
 
     # Increment the property value
     tweet_node["num_likes"] += 1
+    GRAPH.push(tweet_node)
 
     # Add to graph.
     GRAPH.create(Relationship(user_node, "LIKES", tweet_node))
@@ -114,10 +115,111 @@ def follow(follower, followed):
 
     GRAPH.create(Relationship(follower_node, "FOLLOWS", followed_node))
 
+def get_full_feed():
+    """Gets the most recent tweets as a cursor"""
+    query = "MATCH (t:Tweet) RETURN t ORDER BY t.tweeted_on DESC LIMIT 25;"
+    return GRAPH.run(query)
+
+def get_user_feed(handle):
+    """Gets the most recent tweets only from the accounts that the account
+    specified by the handle parameter follow"""
+    query = """
+        MATCH (t:Tweet)<-[:TWEETED]-(u)
+        WHERE (:User {handle: {handle}})-[:FOLLOWS]->(u)
+        RETURN t ORDER BY t.tweeted_on DESC LIMIT 25;
+    """
+    return GRAPH.run(query, handle=handle)
+
+def get_author(tweet_id):
+    """Helper method to get the author of a tweet"""
+
+    query = """
+        MATCH (t:Tweet {tweet_id: {tweet_id}})<-[:TWEETED]-(a)
+        RETURN a.handle as handle, a.name as name;
+    """
+    return GRAPH.run(query, tweet_id=tweet_id)
+
+def format_tweet(tweet_node):
+    """Helper method to take a tweet node and print it out"""
+
+    author = next(get_author(tweet_node['tweet_id']))
+    print("{} - {}".format(author.get('name', author['handle'][1:]), author['handle']))
+    print(tweet_node['text'])
+    print("Likes: {}\tTweeted on: {}".format(tweet_node['num_likes'], tweet_node['tweeted_on']))
+
+def run():
+    """Main twitter client"""
+
+    # A good exercise would be how to authenticate users with passwords.
+    handle = input("What is your handle?: ")
+    if not handle.startswith("@"):
+        handle = "@" + handle
+
+    print("Attempting to create user with handle:", handle)
+    create_user(handle)
+    print()
+
+    # Options Menu
+    print("Options:")
+    print("(l)ike")
+    print("(t)weet")
+    print("(r)efresh")
+    print("(f)ollow")
+    print("(q)uit")
+    print()
+
+    tweets = get_full_feed()
+    while True:
+        try:
+            current_tweet = next(tweets)['t']
+            format_tweet(current_tweet)
+        except StopIteration:
+            print("No more tweets, fetching new ones")
+            tweets = get_full_feed()
+            input("(hit enter to continue): ")
+            current_tweet = None
+
+        option = input("Enter Command (Press enter to continue): ")
+
+        # Like
+        if option.lower() in ["like", "l"]:
+            if current_tweet is not None:
+                like(handle, current_tweet['tweet_id'])
+
+        # Tweet
+        elif option.lower() in ["tweet", "t"]:
+            print("Enter Tweet: (leave blank to cancel)")
+            tweet_text = input(": ")
+            if tweet_text:
+                tweet(handle, tweet_text)
+
+        # Refresh
+        elif option.lower() in ["refresh", "r"]:
+            print("Refreshing tweets...")
+            tweets = get_full_feed()
+
+        # Follow
+        elif option.lower() in ["follow", "f"]:
+            other_handle = input("Other handle?: ")
+            if not other_handle.startswith("@"):
+                other_handle = "@" + other_handle
+            follow(handle, other_handle)
+
+        # Quit
+        elif option.lower() in ["quit", "q"]:
+            print("Goodbye")
+            break
+
+
+
+        print()
+
+
 if __name__ == "__main__":
-    create_user("@nickj")
-    create_user("@nickj", **{"bio": "Cool Kid", "name": "Nick Jarvis"})
-    create_user("@Google", **{"name": "Google Inc."})
+    run()
+    #create_user("@nickj")
+    #create_user("@nickj", **{"bio": "Cool Kid", "name": "Nick Jarvis"})
+    #create_user("@google", name="Google Inc.")
     #t_id = tweet("@ThePSF", "Python 3 is better than Python 2")
     #like("@nickj", t_id)
     #like("@neo4j", t_id)
