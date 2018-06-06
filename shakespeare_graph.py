@@ -114,4 +114,5 @@ def run():
     print()
 
 if __name__ == "__main__":
+    #create() # Uncomment this if you haven't set up the graph yet.
     run()
