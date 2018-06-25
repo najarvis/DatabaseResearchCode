@@ -1,0 +1,21 @@
+{% extends "base_template.html" %}
+
+{% block title %}Expand Order{% endblock %}
+
+{% block content %}
+  {% if order == None %}
+  <input type="text" id="order_num">
+  <button id="submit">Submit</button>
+  <script>
+    $('#submit').on('click', function() {
+      var order_num = $('#order_num').val();
+      window.location.replace("/expand_order/" + order_num);
+    });
+  </script>
+  {% else %}
+    <h2>Order Node</h2>
+    {{ order|safe }}
+    <h2>Product / Details Nodes</h2>
+    {{ products|safe }}
+  {% endif %}
+{% endblock %}

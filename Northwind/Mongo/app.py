@@ -146,3 +146,49 @@ def render_cart():
                                         quantity=quantity))
 
     return jsonify("\n".join(rendered))
+
+@app.route('/expand_order/<order_id>')
+@app.route('/expand_order')
+def expand_order(order_id=None):
+    """This route is pretty basic. Going to it the first time only shows a text
+    input field. If you put an orderID in that field and hit the button, that
+    order will be broken up and displayed."""
+
+    if order_id is None:
+        return render_template("expand.html", data=None)
+
+    order_data = mongo.db.mongo_orders.find_one({"OrderID": int(order_id)}, {"_id": 0})
+    print(order_data)
+    products = order_data.get('Products')
+    id_dict = {product.get('ProductID'): product for product in products}
+    products_data = mongo.db.products.find({"ProductID": {"$in": list(id_dict)}}, {"_id": 0})
+
+    order_template = render_template("generic_document.html", document=order_data)
+    templates = []
+    for pd in products_data:
+        full_doc = {}
+        full_doc.update(pd)
+        full_doc.update(id_dict.get(pd.get('ProductID')))
+        templates.append(render_template("generic_document.html", document=full_doc))
+
+    return render_template("expand.html", order=order_template, products="\n".join(templates))
+
+    # We grab the inital order node
+    order_data = graph.nodes.match("Order", OrderID=order_id).first()
+    # Then grab all order-detail nodes and product nodes related to it.
+    query = """
+        MATCH (od:`Order-Detail` {OrderID: {o_id}})-[:IS]->(p)
+        RETURN p, od;
+    """
+    results = graph.run(query, o_id=order_id)
+
+    order_temp = render_template("generic_document.html", document=dict(order_data))
+    templates = []
+    for result in results:
+        # Combine both the product node and order-detail node into one, then display it.
+        full_doc = {}
+        full_doc.update(result['p'])
+        full_doc.update(result['od'])
+        templates.append(render_template("generic_document.html", document=dict(full_doc)))
+
+    return render_template("expand.html", order=order_temp, products="\n".join(templates))
