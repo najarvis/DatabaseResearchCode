@@ -155,7 +155,7 @@ def expand_order(order_id=None):
     order will be broken up and displayed."""
 
     if order_id is None:
-        return render_template("expand.html", data=None)
+        return render_template("expand.html", order=None)
 
     # Collect all the data from mongo.
     order_data = mongo.db.mongo_orders.find_one({"OrderID": int(order_id)}, {"_id": 0})

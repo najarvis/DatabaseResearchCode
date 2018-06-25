@@ -179,7 +179,7 @@ def expand_order(order_id=None):
     order will be broken up and displayed."""
 
     if order_id is None:
-        return render_template("expand.html", data=None)
+        return render_template("expand.html", order=None)
 
     # We grab the inital order node
     order_data = graph.nodes.match("Order", OrderID=order_id).first()

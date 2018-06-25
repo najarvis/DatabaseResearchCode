@@ -3,7 +3,7 @@
 {% block title %}Expand Order{% endblock %}
 
 {% block content %}
-  {% if order == None %}
+  {% if order is none %}
   <input type="text" id="order_num">
   <button id="submit">Submit</button>
   <script>
