@@ -130,14 +130,22 @@ def order(order_string=""):
 
     # This is an example transaction. Transactions are ACID compliant.
     tx = graph.begin()
+
+    # Create a node based on the dictionary above
     order_node = Node("Order", **order_dict)
     tx.create(order_node)
+
+    # Create a node for each product with the order-detail label.
     for product in products:
         product_id = product.get('ProductID')
         order_detail_node = Node("Order-Detail", **product)
         tx.create(order_detail_node)
+
+        # Match that node to the actual product node
         product_node = graph.run("MATCH (p:Product {ProductID: {pid}}) RETURN p",
                                  pid=product_id).evaluate()
+
+        # Create relationships.
         tx.create(Relationship(order_detail_node, "PART_OF", order_node))
         tx.create(Relationship(order_detail_node, "IS", product_node))
     tx.commit()
