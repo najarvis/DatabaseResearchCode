@@ -47,8 +47,8 @@ def load_csv_to_neo():
         print("Running:\n", repr(query))
         g.run(query)
 
-execute_sql_file('Northwind.Sqlite3.sql')
-get_data_for_export()
+#execute_sql_file('Northwind.Sqlite3.sql')
+#get_data_for_export()
 load_csv_to_neo()
 
 conn.close()

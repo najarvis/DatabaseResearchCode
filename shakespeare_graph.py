@@ -1,7 +1,7 @@
 """Basic querying with neo4j. Checking the relationship of words in Hamlet"""
 
-from py2neo import Graph
 import random
+from py2neo import Graph
 
 GRAPH = Graph(password="password")
 
@@ -104,7 +104,7 @@ def run():
     like, just adjust the 100 below to any length you want (it is the maximum length of
     the string)"""
 
-    previous_word = "alas"
+    previous_word = "ophelia"
     #for _ in range(5):
     words = ""
     while len(words + previous_word) < 100:
