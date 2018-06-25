@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <title>{% block title %}{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+    <script type="text/javascript" src=" {{ url_for('static', filename='js/jquery-3.3.1.min.js') }}"></script>
+    {% block scripts %}
+    {% endblock %}
+  </head>
+  <body>
+    <div class="menu_container">
+      <div class="h_align">
+        <div class="menu">
+          <a href="/search"><div id="search"><div class="v_align">Search</div></div></a>
+          <a href="/order"><div id="order"><div class="v_align">Place Order</div></div></a>
+          <a href="/raw"><div id="raw"><div class="v_align">View Raw Data</div></div></a>
+        </div>
+      </div>
+    </div>
+    <div class="main_container">
+      {% block content %}
+
+      {% endblock %}
+    </div>
+  </body>
+</html>

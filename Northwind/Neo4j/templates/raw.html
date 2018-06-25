@@ -1,0 +1,24 @@
+{% extends "base_template.html" %}
+{% block title %}Raw Database View{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+  $(document).ready(function() {
+    $('#collection_select').on('change', function() {
+      $.get('')
+    });
+  });
+</script>
+{% endblock %}
+
+{% block content %}
+  <div class="links">
+    {% for collection in collections %}
+    <a href="/raw/{{ collection }}">{{ collection }}</a>
+    {%- endfor %}
+  </div>
+
+  <div class="documents">
+    {{ data|safe }}
+  </div>
+{% endblock %}

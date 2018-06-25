@@ -1,0 +1,27 @@
+{% extends "base_template.html" %}
+
+{% block title %}Place Order{% endblock %}
+
+{% block content %}
+<h2>Place order here</h2>
+<form class="order" method="POST">
+  <label for="cust_id">Customer ID</label>
+  <input name="cust_id">
+  <br>
+
+  <label for="emp_id">Employee ID</label>
+  <input name="emp_id">
+  <br>
+
+  <label for="prod_id">Products (ID followed by quanitiy, comma separated - 3,2,1,25).</label>
+  <input name="prod_id" value="{{ order_string }}">
+  <br>
+
+  <label for="req_date">Required Date</label>
+  <input name="req_date" type="date">
+  <br>
+
+  <button>Submit</button>
+</form>
+
+{% endblock %}

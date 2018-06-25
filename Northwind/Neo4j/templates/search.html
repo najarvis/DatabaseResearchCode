@@ -1,0 +1,24 @@
+{% extends "base_template.html" %}
+{% block title %}Northwind Data Search{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript" src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+  <h2>Cart</h2>
+  <div id="cart">
+  </div>
+  <button id="place_order_button">Place Order</button>
+  <h2>Product Search</h2>
+  <div>
+    <div class='form_div'>
+      <form method='post' id='search_form'>
+        <label for="product">Search for a product by name: </label>
+        <input id="search_input" type="text" name="product" required>
+      </form>
+    </div>
+    <div id='results'>
+    </div>
+  </div>
+{% endblock %}

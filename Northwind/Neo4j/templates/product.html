@@ -1,0 +1,20 @@
+<!-- Template for a single product result from the search -->
+<div class="result_div">
+  <div class="result_name_div">
+    <p class="result_name">{{ product['productName'] }}: {{ product['quantityPerUnit'] }}</p>
+  </div>
+  <div class="info">
+    <div>
+      <p>${{ product['unitPrice'] }}</p>
+    </div>
+    <div>
+      {% if product['unitsInStock'] != 0 %}
+        <button onclick="add_to_cart({{ product['productID'] }}, &quot;{{ product['productName'] }}&quot;);">Order Now</button>
+      {% else %}
+        <button disabled>Order Now</button>
+        <br>
+        <small>Out of stock</small>
+      {% endif %}
+    </div>
+  </div>
+</div>
