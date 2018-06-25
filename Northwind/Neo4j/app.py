@@ -3,7 +3,7 @@
     Date: 25 June 2018
 
     This program hosts a basic web server on localhost:5000, and interacts with a
-    Neo4j Database running locally.
+    Neo4j Database running remotely.
 """
 
 import datetime
