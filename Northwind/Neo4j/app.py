@@ -31,35 +31,37 @@ def search():
     search_string = request.form.get('data')
     query = """
         MATCH (p:Product)
-        WHERE p.productName =~ '(?i).*{}.*'
+        WHERE p.ProductName =~ '(?i).*{}.*'
         RETURN p
     """.format(search_string)
     results = graph.run(query)
 
     # Render a template for each product, then combine them into one long string
     # and send to the user.
-    printed = False
     rendered_sections = []
     for result in results:
-        if not printed:
-            print(dict(result[0]))
-            printed = True
         rendered_sections.append(render_template('product.html', product=dict(result[0])))
 
     return jsonify("\n".join(rendered_sections))
 
 @app.route('/raw/<collection>')
 @app.route('/raw')
-def raw(collection='orders'):
+def raw(collection='Order'):
     """A raw view of the entire contents of a collection."""
 
     # Render a template for each document in the collection specified by the url.
     data_arr = []
-    for result in mongo.db[collection].find({}, {"_id": 0}):
-        data_arr.append(render_template("generic_document.html", document=result))
+    query = """
+        MATCH (n:{collection})
+        RETURN n
+    """.format(collection=collection)
+    for result in graph.run(query):
+        data_arr.append(render_template("generic_document.html", document=dict(result[0])))
     raw_html = "\n".join(data_arr)
 
-    collections = mongo.db.collection_names()
+    # return each distinct first label of a node. here Graph.evaluate returns the first result.
+    # Because we are using 'collect', there is only one result.
+    collections = graph.evaluate("MATCH (n) RETURN collect(distinct labels(n)[0]);")
 
     return render_template("raw.html", data=raw_html, collections=collections)
 
@@ -78,18 +80,20 @@ def order(order_string=""):
 
     # Parse customer ID to make sure it is valid. Search database for it.
     cust_id = request.form.get('cust_id')
-    customer_data = mongo.db.customers.find_one({'CustomerID': cust_id})
+    customer_data = dict(graph.nodes.match("Customer", CustomerID=cust_id).first())
     if customer_data is None:
         return "Customer not found!"
 
     # Find the largest order number and increment it to get the next order_number.
     # NOTE: This does not guaruntee that the OrderID is unique, if another user runs
     # this query before this route finishes.
-    order_num = next(mongo.db.orders.find().sort('OrderID', -1).limit(1)).get('OrderID') + 1
+    order_num = int(graph.evaluate("MATCH (o:Order) RETURN max(o.OrderID);")) + 1
+    order_num = str(order_num)
+    print(order_num)
 
     products_requested = request.form.get('prod_id')
     # Convert the string into individual ints.
-    product_data = list(map(int, products_requested.split(',')))
+    product_data = products_requested.split(',')
     if len(product_data) % 2:
         return "Invalid input. There should be even number of products and quanities."
 
@@ -98,12 +102,13 @@ def order(order_string=""):
     for i in range(len(product_data) // 2):
         product_id = product_data[2*i]
         quantity = product_data[2*i+1]
-        product_doc = mongo.db.products.find_one({'ProductID': product_id})
+        product_doc = dict(graph.nodes.match("Product", ProductID=product_id).first())
         products.append({
             'ProductID': product_id,
             'UnitPrice': product_doc.get('UnitPrice'),
             'Quantity': quantity,
-            'Discount': 0
+            'Discount': 0,
+            'OrderID': order_num
         })
 
     # Create the document that will be inserted into the database.
@@ -120,13 +125,25 @@ def order(order_string=""):
         'ShipCity': customer_data.get('City'),
         'ShipRegion': customer_data.get('Region'),
         'ShipPostalCode': customer_data.get('PostalCode'),
-        'ShipCountry': customer_data.get('Country'),
-        'Products': products
+        'ShipCountry': customer_data.get('Country')
     }
 
+    # This is an example transaction. Transactions are ACID compliant.
+    tx = graph.begin()
+    order_node = Node("Order", **order_dict)
+    tx.create(order_node)
+    for product in products:
+        product_id = product.get('ProductID')
+        order_detail_node = Node("Order-Detail", **product)
+        tx.create(order_detail_node)
+        product_node = graph.run("MATCH (p:Product {ProductID: {pid}}) RETURN p",
+                                 pid=product_id).evaluate()
+        tx.create(Relationship(order_detail_node, "PART_OF", order_node))
+        tx.create(Relationship(order_detail_node, "IS", product_node))
+    tx.commit()
+
     # Insert into the databse.
-    mongo.db.mongo_orders.insert(order_dict)
-    return redirect('/raw/mongo_orders')
+    return redirect('/expand_order/' + order_num)
 
 @app.route('/render_cart', methods=['POST'])
 def render_cart():
@@ -145,3 +162,33 @@ def render_cart():
                                         quantity=quantity))
 
     return jsonify("\n".join(rendered))
+
+@app.route('/expand_order/<order_id>')
+@app.route('/expand_order')
+def expand_order(order_id=None):
+    """This route is pretty basic. Going to it the first time only shows a text
+    input field. If you put an orderID in that field and hit the button, that
+    order will be broken up and displayed."""
+
+    if order_id is None:
+        return render_template("expand.html", data=None)
+
+    # We grab the inital order node
+    order_data = graph.nodes.match("Order", OrderID=order_id).first()
+    # Then grab all order-detail nodes and product nodes related to it.
+    query = """
+        MATCH (od:`Order-Detail` {OrderID: {o_id}})-[:IS]->(p)
+        RETURN p, od;
+    """
+    results = graph.run(query, o_id=order_id)
+
+    order_temp = render_template("generic_document.html", document=dict(order_data))
+    templates = []
+    for result in results:
+        # Combine both the product node and order-detail node into one, then display it.
+        full_doc = {}
+        full_doc.update(result['p'])
+        full_doc.update(result['od'])
+        templates.append(render_template("generic_document.html", document=dict(full_doc)))
+
+    return render_template("expand.html", order=order_temp, products="\n".join(templates))

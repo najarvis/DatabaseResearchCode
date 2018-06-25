@@ -1,20 +1,17 @@
 {% extends "base_template.html" %}
 {% block title %}Raw Database View{% endblock %}
 
-{% block scripts %}
-<script type="text/javascript">
-  $(document).ready(function() {
-    $('#collection_select').on('change', function() {
-      $.get('')
-    });
-  });
-</script>
-{% endblock %}
-
 {% block content %}
   <div class="links">
     {% for collection in collections %}
+
+    {% if collection.find('-') != -1 -%}
+    <a href="/raw/`{{ collection }}`">{{ collection }}</a>
+
+    {% else -%}
     <a href="/raw/{{ collection }}">{{ collection }}</a>
+
+    {%- endif %}
     {%- endfor %}
   </div>
 
