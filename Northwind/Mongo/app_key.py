@@ -1,20 +1,29 @@
 """
     Author: Nick Jarvis
-    Date: 25 June 2018
+    Date: 21 June 2018
 
     This program hosts a basic web server on localhost:5000, and interacts with a
-    Neo4j Database running remotely.
+    MongoDB Database hosted by Mongo Atlas.
 """
 
 import datetime
+import os
 
 from flask import Flask, render_template, request, jsonify, redirect
-from py2neo import Graph, Node, Relationship
+from flask_pymongo import PyMongo
 
-graph = Graph("bolt://54.86.9.156:33227",
-              auth=("neo4j", "trace-refurbishment-currency"))
+# Since I'm not a huge fan of putting passwords in plain code,
+# I've placed it in a environment variable saved under 'mongo_atlas_password'
+password = os.environ.get('mongo_atlas_password')
+username = 'najarvis'
 
 app = Flask(__name__)
+# Connect to Atlas. These lines need to come before we initialize PyMongo.
+app.config['MONGO_HOST'] = 'mongodb+srv://' + username + ':' + password + \
+                           '@learningatlas01-1cf8c.gcp.mongodb.net/test?retryWrites=true'
+app.config['MONGO_DBNAME'] = 'Northwind'
+
+mongo = PyMongo(app)
 
 @app.route('/')
 def index():
@@ -27,46 +36,41 @@ def search():
     if request.method == 'GET':
         return render_template("search.html")
 
+    # Diff
+    # Grab all category names and IDs
+    categories = mongo.db.categories.find({}, {"CategoryID": 1, "CategoryName": 1})
+
+    # Diff
+    # Iterate through and create a mapping between the IDs and the category names.
+    category_dict = {cat["CategoryID"]: cat["CategoryName"] for cat in categories}
+
     # Execute the following code if it is a POST request.
     search_string = request.form.get('data')
-    # Regex to match anything before and after the search string, case insensitive.
-    # If the search string was 'cho', it would match 'Chocolate' and 'Ochocinco'
-    query = """
-        MATCH (p:Product)
-        WHERE p.ProductName =~ '(?i).*{}.*'
-        RETURN p
-    """.format(search_string)
-    results = graph.run(query)
+    regex = {"$regex": '.*' + search_string + '.*', '$options': 'i'}
+    results = mongo.db.products.find({"ProductName": regex}, {'_id': 0})
 
     # Render a template for each product, then combine them into one long string
     # and send to the user.
     rendered_sections = []
     for result in results:
-        # result comes back as an array of results, so we only want to grab the first one.
-        # we would want to grab multiple if we were to return multiple things
-        # (i.e. and product and an order)
-        rendered_sections.append(render_template('product.html', product=result[0]))
+        rendered_sections.append(render_template('product_key.html',
+                                                 product=result,
+                                                 categories=category_dict)) # Diff
 
     return jsonify("\n".join(rendered_sections))
 
 @app.route('/raw/<collection>')
 @app.route('/raw')
-def raw(collection='Order'):
+def raw(collection='orders'):
     """A raw view of the entire contents of a collection."""
 
     # Render a template for each document in the collection specified by the url.
     data_arr = []
-    query = """
-        MATCH (n:{collection})
-        RETURN n
-    """.format(collection=collection)
-    for result in graph.run(query):
-        data_arr.append(render_template("generic_document.html", document=result[0]))
+    for result in mongo.db[collection].find({}, {"_id": 0}):
+        data_arr.append(render_template("generic_document.html", document=result))
     raw_html = "\n".join(data_arr)
 
-    # return each distinct first label of a node. here Graph.evaluate returns the first result.
-    # Because we are using 'collect', there is only one result.
-    collections = graph.evaluate("MATCH (n) RETURN collect(distinct labels(n)[0]);")
+    collections = mongo.db.collection_names()
 
     return render_template("raw.html", data=raw_html, collections=collections)
 
@@ -85,35 +89,32 @@ def order(order_string=""):
 
     # Parse customer ID to make sure it is valid. Search database for it.
     cust_id = request.form.get('cust_id')
-    customer_data = graph.nodes.match("Customer", CustomerID=cust_id).first()
+    customer_data = mongo.db.customers.find_one({'CustomerID': cust_id})
     if customer_data is None:
         return "Customer not found!"
 
     # Find the largest order number and increment it to get the next order_number.
     # NOTE: This does not guaruntee that the OrderID is unique, if another user runs
     # this query before this route finishes.
-    order_num = int(graph.evaluate("MATCH (o:Order) RETURN max(o.OrderID);")) + 1
-    order_num = str(order_num)
-    print(order_num)
+    order_num = next(mongo.db.orders.find().sort('OrderID', -1).limit(1)).get('OrderID') + 1
 
     products_requested = request.form.get('prod_id')
     # Convert the string into individual ints.
-    product_data = products_requested.split(',')
+    product_data = list(map(int, products_requested.split(',')))
     if len(product_data) % 2:
-        return "Invalid input. There should be even number of products and quantities."
+        return "Invalid input. There should be even number of products and quanities."
 
     # Build each of the product subdocuments, place them in a list
     products = []
     for i in range(len(product_data) // 2):
-        product_id = product_data[2*i]
-        quantity = product_data[2*i+1]
-        product_doc = graph.nodes.match("Product", ProductID=product_id).first()
+        product_id = product_data[2*i] # Grab every other element (to grab each product ID)
+        quantity = product_data[2*i+1] # Grab every other element offset by 1 (to grab each quantity)
+        product_doc = mongo.db.products.find_one({'ProductID': product_id})
         products.append({
             'ProductID': product_id,
             'UnitPrice': product_doc.get('UnitPrice'),
             'Quantity': quantity,
-            'Discount': 0,
-            'OrderID': order_num
+            'Discount': 0
         })
 
     # Create the document that will be inserted into the database.
@@ -130,33 +131,13 @@ def order(order_string=""):
         'ShipCity': customer_data.get('City'),
         'ShipRegion': customer_data.get('Region'),
         'ShipPostalCode': customer_data.get('PostalCode'),
-        'ShipCountry': customer_data.get('Country')
+        'ShipCountry': customer_data.get('Country'),
+        'Products': products
     }
 
-    # This is an example transaction. Transactions are ACID compliant.
-    tx = graph.begin()
-
-    # Create a node based on the dictionary above
-    order_node = Node("Order", **order_dict)
-    tx.create(order_node)
-
-    # Create a node for each product with the order-detail label.
-    for product in products:
-        product_id = product.get('ProductID')
-        order_detail_node = Node("Order-Detail", **product)
-        tx.create(order_detail_node)
-
-        # Match that node to the actual product node
-        product_node = graph.run("MATCH (p:Product {ProductID: {pid}}) RETURN p",
-                                 pid=product_id).evaluate()
-
-        # Create relationships.
-        tx.create(Relationship(order_detail_node, "PART_OF", order_node))
-        tx.create(Relationship(order_detail_node, "IS", product_node))
-    tx.commit()
-
     # Insert into the databse.
-    return redirect('/expand_order/' + order_num)
+    mongo.db.mongo_orders.insert(order_dict)
+    return redirect('/raw/mongo_orders')
 
 @app.route('/render_cart', methods=['POST'])
 def render_cart():
@@ -186,22 +167,24 @@ def expand_order(order_id=None):
     if order_id is None:
         return render_template("expand.html", order=None)
 
-    # We grab the inital order node
-    order_data = graph.nodes.match("Order", OrderID=order_id).first()
-    # Then grab all order-detail nodes and product nodes related to it.
-    query = """
-        MATCH (od:`Order-Detail` {OrderID: {o_id}})-[:IS]->(p)
-        RETURN p, od;
-    """
-    results = graph.run(query, o_id=order_id)
+    # Collect all the data from mongo.
+    order_data = mongo.db.mongo_orders.find_one({"OrderID": int(order_id)}, {"_id": 0})
+    print(order_data)
+    products = order_data.get('Products')
 
-    order_temp = render_template("generic_document.html", document=dict(order_data))
+    # We grab each of the ids for the products, then do a single mongo query for
+    # them, rather than doing a query for each id individualy.
+    id_dict = {product.get('ProductID'): product for product in products}
+    products_data = mongo.db.products.find({"ProductID": {"$in": list(id_dict)}}, {"_id": 0})
+
+    # Render templates for the order and products.
+    order_template = render_template("generic_document.html", document=order_data)
     templates = []
-    for result in results:
-        # Combine both the product node and order-detail node into one, then display it.
+    for pd in products_data:
+        # Combine the two dictionaries
         full_doc = {}
-        full_doc.update(result['p'])
-        full_doc.update(result['od'])
-        templates.append(render_template("generic_document.html", document=dict(full_doc)))
+        full_doc.update(pd)
+        full_doc.update(id_dict.get(pd.get('ProductID')))
+        templates.append(render_template("generic_document.html", document=full_doc))
 
-    return render_template("expand.html", order=order_temp, products="\n".join(templates))
+    return render_template("expand.html", order=order_template, products="\n".join(templates))

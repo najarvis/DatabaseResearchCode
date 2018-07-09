@@ -1,0 +1,22 @@
+<!-- Template for a single product result from the search -->
+<div class="result_div">
+  <div class="result_name_div">
+    <p class="result_name">{{ product['ProductName'] }}: {{ product['QuantityPerUnit'] }}</p>
+  </div>
+  <div class="info">
+    <div>
+      <p><b>{{ category }}</b></p> <!-- Diff -->
+      <p>${{ product['UnitPrice'] }}</p>
+      <p><span id="{{ product['ProductID'] }}_left">{{ product['UnitsInStock'] }}</span> left in stock.</p>
+    </div>
+    <div>
+      {% if product['UnitsInStock'] != '0' %}
+        <button onclick="add_to_cart({{ product['ProductID'] }}, &quot;{{ product['ProductName'] }}&quot;);">Order Now</button>
+      {% else %}
+        <button disabled>Order Now</button>
+        <br>
+        <small>Out of stock</small>
+      {% endif %}
+    </div>
+  </div>
+</div>

@@ -11,8 +11,8 @@ import datetime
 from flask import Flask, render_template, request, jsonify, redirect
 from py2neo import Graph, Node, Relationship
 
-graph = Graph("bolt://54.86.9.156:33227",
-              auth=("neo4j", "trace-refurbishment-currency"))
+graph = Graph("bolt://18.207.142.251:34366",
+              auth=("neo4j", "capitals-photodiode-winter"))
 
 app = Flask(__name__)
 
@@ -32,9 +32,9 @@ def search():
     # Regex to match anything before and after the search string, case insensitive.
     # If the search string was 'cho', it would match 'Chocolate' and 'Ochocinco'
     query = """
-        MATCH (p:Product)
+        MATCH (p:Product)-[:IS_CATEGORY]->(c)
         WHERE p.ProductName =~ '(?i).*{}.*'
-        RETURN p
+        RETURN p, c.CategoryName
     """.format(search_string)
     results = graph.run(query)
 
@@ -42,10 +42,9 @@ def search():
     # and send to the user.
     rendered_sections = []
     for result in results:
-        # result comes back as an array of results, so we only want to grab the first one.
-        # we would want to grab multiple if we were to return multiple things
-        # (i.e. and product and an order)
-        rendered_sections.append(render_template('product.html', product=result[0]))
+        # result comes back as an array of results, so we weamt to grab both the product
+        # (the first element) and the category name (the second element).
+        rendered_sections.append(render_template('product_key.html', product=result[0], category=result[1]))
 
     return jsonify("\n".join(rendered_sections))
 
