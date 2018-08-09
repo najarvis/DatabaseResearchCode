@@ -1,6 +1,6 @@
 	HAMLET
 
-	DRAMATIS PERSONAE
+		DRAMATIS PERSONAE
 
 CLAUDIUS	king of Denmark. (KING CLAUDIUS:)
 
@@ -3802,9 +3802,9 @@ SCENE II	Another room in the castle.
 
 HAMLET	Safely stowed.
 
-ROSENCRANTZ:	|
+[ROSENCRANTZ:	|
 	|   [Within]  Hamlet! Lord Hamlet!
-GUILDENSTERN:	|
+GUILDENSTERN:	|]
 
 HAMLET	What noise? who calls on Hamlet?
 	O, here they come.

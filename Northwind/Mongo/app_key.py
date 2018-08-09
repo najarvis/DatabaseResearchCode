@@ -44,6 +44,13 @@ def search():
     # Iterate through and create a mapping between the IDs and the category names.
     category_dict = {cat["CategoryID"]: cat["CategoryName"] for cat in categories}
 
+    # Simpler Solution to the line above.
+    # category_dict = {}
+    # for cat in categories:
+    #     cat_id = cat['CategoryID']
+    #     cat_name = cat['CategoryName']
+    #     category_dict[cat_id] = cat_name
+
     # Execute the following code if it is a POST request.
     search_string = request.form.get('data')
     regex = {"$regex": '.*' + search_string + '.*', '$options': 'i'}
@@ -53,9 +60,10 @@ def search():
     # and send to the user.
     rendered_sections = []
     for result in results:
+        category = category_dict[result['CategoryID']]
         rendered_sections.append(render_template('product_key.html',
                                                  product=result,
-                                                 categories=category_dict)) # Diff
+                                                 category=category)) # Diff
 
     return jsonify("\n".join(rendered_sections))
 
